@@ -14,7 +14,18 @@ STL files used for this prject from Marcio Jose Soares https://www.thingiverse.c
 
 ## 🛠️ Required Hardware
 
--  4 * 470 Ω resistors 
+-  4 * 470 Ω resistors
+-  1 red led
+-  1 green led
+-  1 blue led
+-  1 yellow led
+-  1 4x4 membrane keypad
+-  1 servo motor
+-  1 servo horn
+-  1 3d printer with pla filament
+-  1 battery (at least 6 v and not above 12 v)
+-  1 DC Barrel Jack 2,1mm x 5,5mm
+-  jumper wires
 
 ## 🔌 Wiring Diagram
 
