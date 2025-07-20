@@ -8,7 +8,7 @@ The Schlossinator is a microcontroller-based doorlock using an Arduino, a servo 
 * 🔵 reset state: during reset state you are asked to enter a new password and confirm by pressing D. The reset state is represented by a blue glowing led. You open the reset state by pressing the C button.
 * 🟡 check password state: before you are able to enter 🔴 lock state, 🟢 unlock state or 🔵 reset state the system will change into the check password state to verify the user. The  check password state state is represented by a yellow glowing led. If the user gets the password wrong the yellow led will blink and the system will change into the previous state.
 
-STL files used for this prject from Marcio Jose Soares https://www.thingiverse.com/thing:5831395
+STL files used for this project by Marcio Jose Soares https://www.thingiverse.com/thing:5831395
 
 ![schlossinator testing on breadboard](https://github.com/user-attachments/assets/c0d0d905-bf8f-43f9-811b-7814dde13306)
 
@@ -32,5 +32,13 @@ STL files used for this prject from Marcio Jose Soares https://www.thingiverse.c
 <img width="3507" height="2480" alt="image" src="https://github.com/user-attachments/assets/ed2cdad7-d862-4668-9805-4982d8534aa4" />
 
 ## 🚀 Installation
+- 3d print the parts from https://www.thingiverse.com/thing:5831395
+- connect the components as shown in the circuit diagram
+- connect your Arduino board via USB.
+- open the schlossinator.ino file in the Arduino IDE.
+- install required libraries:
+    * Servo by Michael Margolis
+    * Keypad by Mark Stanley, Alexander Brewing
+- click the upload button to flash the program.
 
 Have fun assembling :D
