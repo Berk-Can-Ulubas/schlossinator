@@ -29,6 +29,8 @@ STL files used for this prject from Marcio Jose Soares https://www.thingiverse.c
 
 ## 🔌 Wiring Diagram
 
+<img width="3507" height="2480" alt="image" src="https://github.com/user-attachments/assets/c34dc7f5-02e1-4f4a-8802-55d90427c10e" />
+
 ## 🚀 Installation
 
 Have fun assembling :D
