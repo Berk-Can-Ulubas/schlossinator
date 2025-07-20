@@ -1,6 +1,6 @@
 # schlossinator
 
-The Schlossinator is a microcontroller-based doorlock using an Arduino, a servo motor, and a 4x4 membrane keypad.
+Schlossinator is a microcontroller-based doorlock using an Arduino, a servo motor, and a 4x4 membrane keypad.
 4 leds give visual feedback and represent the states.
 
 * 🔴 lock state:  in the lock state the door becomes locked and its represenred by a red glowing led. You open the reset state by pressing the A button.
