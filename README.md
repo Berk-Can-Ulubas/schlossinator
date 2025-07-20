@@ -10,7 +10,7 @@ The Schlossinator is a microcontroller-based doorlock using an Arduino, a servo 
 
 STL files used for this prject from Marcio Jose Soares https://www.thingiverse.com/thing:5831395
 
-![schlossinator preview on breadboard](https://github.com/user-attachments/assets/31e4e9d3-cdd9-4528-a2f6-c5f99286d5bb)
+![schlossinator testing on breadboard](https://github.com/user-attachments/assets/c0d0d905-bf8f-43f9-811b-7814dde13306)
 
 ## 🛠️ Required Hardware
 
