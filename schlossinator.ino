@@ -1,9 +1,9 @@
 /************************************************************************************************************************************
 *     @file:       schlossinator.ino
 *     @author:     Berk Can Ulubas
-*     @date:       19.07.2025
+*     @date:       18.06.2026
 *     @brief:      This programm controlls an servo motor for an doorlock. 
-*                 The 4x4 membrane keypad is used to switch modes and transfer the password.
+*                 The 4x4 membrane keypad is used to switch modes and transfer the password. 
 *
 *************************************************************************************************************************************
 */
@@ -16,179 +16,242 @@
 #define GREEN_LED A1
 #define BLUE_LED A2
 #define YELLOW_LED A3
+#define INSIDE_BUTTON 12
 
-Servo servo;
-char password[10];
-bool locked = false;
-
-char keys[ROWS][COLS] = {
-  {'1','2','3','A'},
-  {'4','5','6','B'},
-  {'7','8','9','C'},
-  {'*','0','#','D'}
+enum LockState {
+  UNLOCK,
+  LOCK
 };
 
-byte rowPins[ROWS] = {9, 8, 7, 6};
-byte colPins[COLS] = {5, 4, 3, 2};
+enum InputMode {
+  UNUSED,
+  RESET_PASSWORD,
+  CHECK_PASSWORD
+};
+
+enum Action {
+  NONE,
+  TRY_UNLOCK,
+  TRY_LOCK,
+  TRY_RESET_PASSWORD,
+  RESETTING_NOW
+};
+
+const char* lock_state_names[] = { "UNLOCK", "LOCK" };
+const char* input_mode_names[] = { "UNUSED", "RESET_PASSWORD", "CHECK_PASSWORD" };
+const char* action_names[] = { "NONE", "TRY_UNLOCK", "TRY_LOCK", "TRY_RESET_PASSWORD", "RESETTING_NOW" };
+
+LockState lock_state;
+InputMode input_mode;
+Action action;
+Servo servo;
+char password[10];
+int last_button = LOW;
+char input[10];
+int input_index = 0;
+int password_index = 0;
+bool check_failed = false;
+unsigned long last_press_time = 0;
+const unsigned long debounce_time = 500;
+
+char keys[ROWS][COLS] = {
+  { 'D', 'C', 'B', 'A' },
+  { '#', '9', '6', '3' },
+  { '0', '8', '5', '2' },
+  { '*', '7', '4', '1' }
+};
+
+byte rowPins[ROWS] = { 2, 3, 4, 5 };
+byte colPins[COLS] = { 6, 7, 8, 9 };
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
-void setup() 
-{
+void setup() {
   pinMode(GREEN_LED, OUTPUT);
   pinMode(RED_LED, OUTPUT);
   pinMode(BLUE_LED, OUTPUT);
   pinMode(YELLOW_LED, OUTPUT);
-  servo.attach(11); 
+  servo.attach(10);
+  pinMode(INSIDE_BUTTON, INPUT_PULLUP);
 
   calibrate();
-  reset_password();
-  unlock();
+  lock_state = UNLOCK;
+  input_mode = RESET_PASSWORD;
+  action = RESETTING_NOW;
+  digitalWrite(GREEN_LED, HIGH);
+  digitalWrite(RED_LED, LOW);
+  digitalWrite(YELLOW_LED, LOW);
+  digitalWrite(BLUE_LED, HIGH);
+  input[0] = '\0';
+  password[0] = '\0';
+  Serial.begin(9600);
+  Serial.println("System gestartet");
 }
+
 
 /***************************************************************************************************************************************************************
 *     brief:      super loop in which the next state is determined
 *
 ****************************************************************************************************************************************************************
 */
-void loop() 
-{
+void loop() {
+  // 1. read input
   char key = keypad.getKey();
-  
-  if (key) 
-  {
-    switch (key)
-    {
-      case 'A': 
-        if (check_password())
-        {
-          unlock();
-        }
-        else
-        {
-          password_is_wrong();
-        }
+  bool inside_toggle = read_inside_button();
+
+
+  //2.1 check if key is valid
+  if (key != NO_KEY) {
+    Serial.print("Key gedrückt: ");
+    Serial.println(key);
+
+    if (key == 'A' || key == 'B' || key == 'C') {  //2.2 if key is action change Action
+      switch (key) {
+        case 'A':
+          action = TRY_UNLOCK;
+          input_mode = CHECK_PASSWORD;
+          break;
+        case 'B':
+          action = TRY_LOCK;
+          input_mode = CHECK_PASSWORD;
+          break;
+        case 'C':
+          action = TRY_RESET_PASSWORD;
+          input_mode = CHECK_PASSWORD;
+      }
+    } else if (key >= '0' && key <= '9') {  // 3. if key is number change input_mode
+      switch (input_mode) {
+        case UNUSED:
+          break;
+        case CHECK_PASSWORD:
+          input[input_index] = key;
+          input_index++;
+          if (input_index >= 9) {
+            input_mode = UNUSED;
+            key = 'D';
+          }
+          break;
+        case RESET_PASSWORD:
+          password[password_index] = key;
+          password_index++;
+          if (password_index >= 9) {
+            password[9] = '\0';
+            action = NONE;
+            input_mode = UNUSED;
+          }
+      }
+    } else if (key == 'D') {  // 4.1 if key is D change state
+      input[input_index] = '\0';
+      password[password_index] = '\0';
+      Serial.print("Input: ");
+      Serial.println(input);
+      Serial.print("password: ");
+      Serial.println(password);
+      switch (action) {
+        case NONE:
+          break;
+        case TRY_UNLOCK:
+          if (compare_char_arrays(input, password)) {
+            lock_state = UNLOCK;
+            action = NONE;
+            input_mode = UNUSED;
+          } else {
+            input_mode = UNUSED;
+            check_failed = true;
+            action = NONE;
+          }
+          break;
+        case TRY_LOCK:
+          if (compare_char_arrays(input, password)) {
+            lock_state = LOCK;
+            action = NONE;
+            input_mode = UNUSED;
+          } else {
+            input_mode = UNUSED;
+            check_failed = true;
+            action = NONE;
+          }
+          break;
+        case TRY_RESET_PASSWORD:
+          if (compare_char_arrays(input, password)) {
+            action = RESETTING_NOW;
+            input_mode = RESET_PASSWORD;
+            password_index = 0;
+            password[0] = '\0';
+          } else {
+            input_mode = UNUSED;
+            check_failed = true;
+            action = NONE;
+          }
+          break;
+        case RESETTING_NOW:
+          action = NONE;
+          input_mode = UNUSED;
+      }
+
+      //reset input
+      input_index = 0;
+      input[0] = '\0';
+    }
+  }
+
+
+
+  // 4.2 change state based on inside_button
+  if (inside_toggle && action != RESETTING_NOW) {
+    if (lock_state == UNLOCK) {
+      lock_state = LOCK;
+    } else {
+      lock_state = UNLOCK;
+    }
+  }
+
+  // 5. output based on state and input_mode (LED, Servo)
+  if (key != NO_KEY || inside_toggle) {
+    Serial.print("Action: ");
+    Serial.println(action_names[action]);
+
+    Serial.print("InputMode: ");
+    Serial.println(input_mode_names[input_mode]);
+
+    Serial.print("LockState: ");
+    Serial.println(lock_state_names[lock_state]);
+
+    switch (lock_state) {
+      case UNLOCK:
+        digitalWrite(GREEN_LED, HIGH);
+        digitalWrite(RED_LED, LOW);
+        servo.write(70);
         break;
-      case 'B': 
-        if (check_password())
-        {
-          lock();
-        }
-        else
-        {
-          password_is_wrong();
-        }
+      case LOCK:
+        digitalWrite(RED_LED, HIGH);
+        digitalWrite(GREEN_LED, LOW);
+        servo.write(140);
+    }
+
+    switch (input_mode) {
+      case UNUSED:
+        digitalWrite(YELLOW_LED, LOW);
+        digitalWrite(BLUE_LED, LOW);
         break;
-      case 'C': 
-        if (check_password())
-        {
-          reset_password();
-        }
-        else
-        {
-          password_is_wrong();
-        }
+      case RESET_PASSWORD:
+        digitalWrite(BLUE_LED, HIGH);
+        digitalWrite(YELLOW_LED, LOW);
         break;
+      case CHECK_PASSWORD:
+        digitalWrite(YELLOW_LED, HIGH);
+        digitalWrite(BLUE_LED, LOW);
+    }
+    if (check_failed) {
+      for (int i = 0; i < 6; i++) {
+        digitalWrite(YELLOW_LED, HIGH);
+        delay(200);
+        digitalWrite(YELLOW_LED, LOW);
+        delay(200);
+      }
+      check_failed = false;
     }
   }
-}
-
-/***************************************************************************************************************************************************************
-*     brief:      turns on red led and moves the servo motor so the door is locked
-*
-****************************************************************************************************************************************************************
-*/
-void lock()
-{
-  digitalWrite(RED_LED, HIGH);
-  digitalWrite(GREEN_LED, LOW);
-  locked = true;
-  servo.write(140);
-}
-
-/***************************************************************************************************************************************************************
-*     brief:      turns on green led and moves the servo motor so the door is unlocked
-*
-****************************************************************************************************************************************************************
-*/
-void unlock()
-{
-  digitalWrite(GREEN_LED, HIGH);
-  digitalWrite(RED_LED, LOW);
-  locked = false;
-  servo.write(70);
-}
-
-/***************************************************************************************************************************************************************
-*     @brief:      reads input (only numbers) asnd overwrites the current password, while turning on the blue led
-*
-****************************************************************************************************************************************************************
-*/
-void reset_password()
-{
-  digitalWrite(BLUE_LED, HIGH);
-  digitalWrite(GREEN_LED, LOW);
-  digitalWrite(RED_LED, LOW);
-  char key = keypad.getKey();
-  int password_length = 0;
-  while(password_length <=9 && key != 'D')
-  {
-    key = keypad.getKey();
-    if (key == 'D')
-    {
-      break;
-    }
-    if (key >= '0' &&  key<= '9')
-    {
-      password[password_length] = key;
-      password_length++;
-    }
-  }
-  password[password_length] = '\0';
-  digitalWrite(BLUE_LED, LOW);
-  if(locked)
-  {
-    digitalWrite(RED_LED, HIGH);
-  }
-  else
-  {
-    digitalWrite(GREEN_LED, HIGH);
-  }
-}
-
-/***************************************************************************************************************************************************************
-*     @brief:       reads input (only numbers) and after pressing D or typing 9 numbers it compers the input with the current password
-*     @return:      true when input equals password
-*
-****************************************************************************************************************************************************************
-*/
-bool  check_password()
-{
-  digitalWrite(YELLOW_LED, HIGH);
-  digitalWrite(GREEN_LED, LOW);
-  digitalWrite(RED_LED, LOW);
-  char key = keypad.getKey();
-  int input_length = 0;
-  char input[10];
-  while(input_length <=9 && key != 'D')
-  {
-    key = keypad.getKey();
-    if (key >= '0' &&  key<= '9')
-    {
-      input[input_length] = key;
-      input_length++;
-    }
-  }
-  digitalWrite(YELLOW_LED, LOW);
-  if(locked)
-  {
-    digitalWrite(RED_LED, HIGH);
-  }
-  else
-  {
-    digitalWrite(GREEN_LED, HIGH);
-  }
-  return compare_char_arrays(input, password);
 }
 
 /***************************************************************************************************************************************************************
@@ -199,44 +262,15 @@ bool  check_password()
 *
 ****************************************************************************************************************************************************************
 */
-bool compare_char_arrays(char array1[], char array2[])
-{
+bool compare_char_arrays(char* string1, char* string2) {
   int i = 0;
-  while (array1[i] != '\0' && array2[i] != '\0')
-  {
-    if(array1[i] != array2[i])
-    {
+  while (string1[i] != '\0' && string2[i] != '\0') {
+    if (string1[i] != string2[i]) {
       return false;
     }
     i++;
   }
-  return true;
-}
-
-/***************************************************************************************************************************************************************
-*     @brief:      this fnction lets the yellow led blink beacause the input was wrong
-*
-****************************************************************************************************************************************************************
-*/
-void password_is_wrong()
-{
-  digitalWrite(GREEN_LED, LOW);
-  digitalWrite(RED_LED, LOW);
-  for (int i = 0; i < 6; i++)
-  {
-    digitalWrite(YELLOW_LED, HIGH);
-    delay(200);
-    digitalWrite(YELLOW_LED, LOW);
-    delay(200);
-  } 
-  if(locked)
-  {
-    digitalWrite(RED_LED, HIGH);
-  }
-  else
-  {
-    digitalWrite(GREEN_LED, HIGH);
-  }
+  return string1[i] == '\0' && string2[i] == '\0';
 }
 
 /***************************************************************************************************************************************************************
@@ -244,7 +278,27 @@ void password_is_wrong()
 *
 ****************************************************************************************************************************************************************
 */
-void calibrate()
-{
-  servo.write(100);   
+void calibrate() {
+  servo.write(100);
+}
+
+/***************************************************************************************************************************************************************
+*     @brief:      shows if the inside botton got pressed
+*
+****************************************************************************************************************************************************************
+*/
+bool read_inside_button() {
+  int current_button = digitalRead(INSIDE_BUTTON);
+  bool toggle = false;
+  if (last_button == HIGH && current_button == LOW) {
+    if (millis() - last_press_time  > debounce_time) {
+      toggle = true;
+      last_press_time = millis();
+    }
+  }
+  if (toggle) {
+    Serial.println("toggle");
+  }
+  last_button = current_button;
+  return toggle;
 }
