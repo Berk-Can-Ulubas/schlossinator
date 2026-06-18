@@ -37,10 +37,6 @@ enum Action {
   RESETTING_NOW
 };
 
-const char* lock_state_names[] = { "UNLOCK", "LOCK" };
-const char* input_mode_names[] = { "UNUSED", "RESET_PASSWORD", "CHECK_PASSWORD" };
-const char* action_names[] = { "NONE", "TRY_UNLOCK", "TRY_LOCK", "TRY_RESET_PASSWORD", "RESETTING_NOW" };
-
 LockState lock_state;
 InputMode input_mode;
 Action action;
@@ -85,8 +81,8 @@ void setup() {
   digitalWrite(BLUE_LED, HIGH);
   input[0] = '\0';
   password[0] = '\0';
-  Serial.begin(9600);
-  Serial.println("System gestartet");
+  input_index = 0;
+  password_index = 0;
 }
 
 
@@ -103,9 +99,6 @@ void loop() {
 
   //2.1 check if key is valid
   if (key != NO_KEY) {
-    Serial.print("Key gedrückt: ");
-    Serial.println(key);
-
     if (key == 'A' || key == 'B' || key == 'C') {  //2.2 if key is action change Action
       switch (key) {
         case 'A':
@@ -147,10 +140,7 @@ void loop() {
       input[input_index] = '\0';
       password[password_index] = '\0';
       input_full_flag = false;
-      Serial.print("Input: ");
-      Serial.println(input);
-      Serial.print("password: ");
-      Serial.println(password);
+
       switch (action) {
         case NONE:
           break;
@@ -212,15 +202,6 @@ void loop() {
 
   // 5. output based on state and input_mode (LED, Servo)
   if (key != NO_KEY || inside_toggle) {
-    Serial.print("Action: ");
-    Serial.println(action_names[action]);
-
-    Serial.print("InputMode: ");
-    Serial.println(input_mode_names[input_mode]);
-
-    Serial.print("LockState: ");
-    Serial.println(lock_state_names[lock_state]);
-
     switch (lock_state) {
       case UNLOCK:
         digitalWrite(GREEN_LED, HIGH);
@@ -299,9 +280,6 @@ bool read_inside_button() {
       toggle = true;
       last_press_time = millis();
     }
-  }
-  if (toggle) {
-    Serial.println("toggle");
   }
   last_button = current_button;
   return toggle;
