@@ -53,6 +53,7 @@ int password_index = 0;
 bool check_failed = false;
 unsigned long last_press_time = 0;
 const unsigned long debounce_time = 500;
+bool input_full_flag = false;
 
 char keys[ROWS][COLS] = {
   { 'D', 'C', 'B', 'A' },
@@ -127,8 +128,9 @@ void loop() {
           input[input_index] = key;
           input_index++;
           if (input_index >= 9) {
-            input_mode = UNUSED;
-            key = 'D';
+            input_index = 9;
+            input[9] = '\0';
+            input_full_flag = true;
           }
           break;
         case RESET_PASSWORD:
@@ -136,13 +138,15 @@ void loop() {
           password_index++;
           if (password_index >= 9) {
             password[9] = '\0';
-            action = NONE;
-            input_mode = UNUSED;
+            password_index = 9;
+            input_full_flag = true;
           }
       }
-    } else if (key == 'D') {  // 4.1 if key is D change state
+    }
+    if (key == 'D' || input_full_flag) {  // 4.1 if key is D change state
       input[input_index] = '\0';
       password[password_index] = '\0';
+      input_full_flag = false;
       Serial.print("Input: ");
       Serial.println(input);
       Serial.print("password: ");
@@ -291,7 +295,7 @@ bool read_inside_button() {
   int current_button = digitalRead(INSIDE_BUTTON);
   bool toggle = false;
   if (last_button == HIGH && current_button == LOW) {
-    if (millis() - last_press_time  > debounce_time) {
+    if (millis() - last_press_time > debounce_time) {
       toggle = true;
       last_press_time = millis();
     }
